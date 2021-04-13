@@ -54,11 +54,38 @@ def reverse_geocode(ll):
     return features[0]["GeoObject"] if features else None
 
 
+def reverse_geocode_by_address(address):
+    toponym_to_find = address
+
+    geocoder_api_server = "http://geocode-maps.yandex.ru/1.x/"
+
+    geocoder_params = {
+        "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
+        "geocode": toponym_to_find,
+        "format": "json"}
+
+    response = requests.get(geocoder_api_server, params=geocoder_params)
+
+    if not response:
+        raise RuntimeError(
+            """Ошибка выполнения запроса:
+            {request}
+            Http статус: {status} ({reason})""".format(
+                request=geocoder_request, status=response.status_code, reason=response.reason))
+
+    # Преобразуем ответ в json-объект
+    json_response = response.json()
+
+    # Получаем первый топоним из ответа геокодера.
+    features = json_response["response"]["GeoObjectCollection"]["featureMember"]
+    return features[0]["GeoObject"] if features else None
+
+
 # Структура для хранения результатов поиска:
 # координаты объекта, его название и почтовый индекс, если есть.
 
 class SearchResult(object):
-    def __init__(self, point, address, postal_code=None):
+    def __init__(self, point, address=None, postal_code=None):
         self.point = point
         self.address = address
         self.postal_code = postal_code
@@ -82,7 +109,6 @@ class Button:
 
     def draw(self, screen):
         screen.blit(self.image, [self.x, self.y])
-        self.add_button_text(screen)
 
     def add_button_text(self, screen):
         text = self.font.render(self.text, True, self.text_color)
@@ -94,7 +120,7 @@ class Button:
         self.is_active = flag
         if self.is_active:
             pygame.draw.rect(self.image, pygame.Color(self.active_color), [0, 0,
-                                                                    self.width, self.height])
+                                                                           self.width, self.height])
             self.add_button_text(self.image)
         else:
             pygame.draw.rect(self.image, pygame.Color(self.color), [0, 0,
@@ -103,6 +129,47 @@ class Button:
 
     def check_pos(self, pos):
         return self.x <= pos[0] <= self.x + self.width and self.y <= pos[1] <= self.y + self.height
+
+
+class InputBox:
+    def __init__(self, x, y, w, h, color, active_color, text=''):
+        self.rect = pygame.Rect(x, y, w, h)
+        self.color = color
+        self.color_base = color
+        self.active_color = active_color
+
+        self.text = text
+        self.font = pygame.font.Font(None, 30)
+        self.txt_surface = self.font.render(text, True, self.color)
+        self.active = False
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            # If the user clicked on the input_box rect.
+            if self.rect.collidepoint(event.pos):
+                # Toggle the active variable.
+                self.active = not self.active
+            else:
+                self.active = False
+            # Change the current color of the input box.
+            self.color = self.active_color if self.active else self.color_base
+        if event.type == pygame.KEYDOWN:
+            if self.active:
+
+                if event.key == pygame.K_BACKSPACE:
+                    self.text = self.text[:-1]
+                else:
+                    key = event.__str__().split('{')[1].split('}')[0].split(', ')[0].split(": '")[1][:-1]
+                    if key in '123456789- _qwertyuiopasdfghjklzxcvbnmйцукенгшщзхъэждлорпавыфячсмитьбю,':
+                        self.text += key
+                # Re-render the text.
+                self.txt_surface = self.font.render(self.text[:17], True, self.color)
+
+    def draw(self, screen):
+        # Blit the text.
+        screen.blit(self.txt_surface, (self.rect.x + 5, self.rect.y + 5))
+        # Blit the rect.
+        pygame.draw.rect(screen, self.color, self.rect, 2)
 
 
 # Параметры отображения карты:
@@ -120,11 +187,12 @@ class MapParams(object):
         self.search_result = None  # Найденный объект для отображения на карте.
         self.use_postal_code = False
         self.buttons = [
-            Button(85, 5, 100, 40, 'sat'),
-            Button(195, 5, 100, 40, 'map'),
-            Button(305, 5, 100, 40, 'trf'),
-            Button(415, 5, 100, 40, 'skl')
+            Button(230, 5, 100, 40, 'sat'),
+            Button(340, 5, 100, 40, 'map'),
+            Button(450, 5, 100, 40, 'trf'),
+            Button(560, 5, 100, 40, 'skl')
         ]
+        self.input_box = InputBox(10, 5, 200, 40, '#ffffff', '#000000')
 
     # Преобразование координат в параметр ll
     def ll(self):
@@ -152,21 +220,36 @@ class MapParams(object):
             self.lat -= LAT_STEP * math.pow(2, 15 - self.zoom)
             if self.lat < 0:
                 self.lat = abs(self.lat) - 90
+        elif event.key == pygame.K_RETURN:  # DOWN_ARROW
+            if self.input_box.text:
+                data = reverse_geocode_by_address(self.input_box.text)
+                if data is not None:
+                    data = [
+                        data["Point"]["pos"].split(' '),
+                    ]
+                    self.search_result = SearchResult(*data)
 
 
 # Создание карты с соответствующими параметрами.
 def load_map(mp):
-    map_request = "http://static-maps.yandex.ru/1.x/?ll={ll}&z={z}&l={type}".format(ll=mp.ll(),
-                                                                                    z=mp.zoom,
-                                                                                    type=mp.type)
+    geocoder_params = {
+        "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
+        'll': mp.ll(),
+        'z': mp.zoom,
+        'type': mp.type,
+        'l': mp.type
+    }
+    geocoder_api_server = "http://static-maps.yandex.ru/1.x/"
     if mp.search_result:
-        map_request += "&pt={0},{1},pm2grm".format(mp.search_result.point[0],
-                                                   mp.search_result.point[1])
+        geocoder_params['pt'] = "{0},{1},pm2grm".format(mp.search_result.point[0],
+                                                        mp.search_result.point[1])
+        mp.lon, mp.lat = mp.search_result.point[0], mp.search_result.point[1]
+        geocoder_params['ll'] = mp.ll()
+    response = requests.get(geocoder_api_server, params=geocoder_params)
 
-    response = requests.get(map_request)
     if not response:
         print("Ошибка выполнения запроса:")
-        print(map_request)
+        print(response.url)
         print("Http статус:", response.status_code, "(", response.reason, ")")
         sys.exit(1)
 
@@ -185,14 +268,16 @@ def load_map(mp):
 def main():
     # Инициализируем pygame
     pygame.init()
-    screen = pygame.display.set_mode((600, 500))
+    screen = pygame.display.set_mode((700, 500))
+    screen.fill('#b6c5b9')
 
     # Заводим объект, в котором будем хранить все параметры отрисовки карты.
     mp = MapParams()
     map_file = load_map(mp)
-    screen.blit(pygame.image.load(map_file), (0, 50))
+    screen.blit(pygame.image.load(map_file), (50, 50))
     for button in mp.buttons:
         button.draw(screen)
+    mp.input_box.draw(screen)
     pygame.display.flip()
 
     while True:
@@ -210,12 +295,16 @@ def main():
                     mp.type = button.text if button.text in ('map', 'sat') else mp.type + f',{button.text}'
         else:
             continue
+        mp.input_box.handle_event(event)
 
         # Загружаем карту, используя текущие параметры.
+        screen.fill('#b6c5b9')
+        mp.input_box.draw(screen)
+
         map_file = load_map(mp)
 
         # Рисуем картинку, загружаемую из только что созданного файла.
-        screen.blit(pygame.image.load(map_file), (0, 50))
+        screen.blit(pygame.image.load(map_file), (50, 50))
 
         for button in mp.buttons:
             button.draw(screen)
