@@ -193,6 +193,7 @@ class MapParams(object):
             Button(560, 5, 100, 40, 'skl')
         ]
         self.input_box = InputBox(10, 5, 200, 40, '#ffffff', '#000000')
+        self.clear_search_button = Button(10, 50, 100, 40, 'clear')
 
     # Преобразование координат в параметр ll
     def ll(self):
@@ -267,16 +268,17 @@ def load_map(mp):
 def main():
     # Инициализируем pygame
     pygame.init()
-    screen = pygame.display.set_mode((700, 500))
+    screen = pygame.display.set_mode((800, 500))
     screen.fill('#b6c5b9')
 
     # Заводим объект, в котором будем хранить все параметры отрисовки карты.
     mp = MapParams()
     map_file = load_map(mp)
-    screen.blit(pygame.image.load(map_file), (50, 50))
+    screen.blit(pygame.image.load(map_file), (150, 50))
     for button in mp.buttons:
         button.draw(screen)
     mp.input_box.draw(screen)
+    mp.clear_search_button.draw(screen)
     pygame.display.flip()
 
     while True:
@@ -291,7 +293,15 @@ def main():
                 if button.check_pos(event.pos) and button is not button_active:
                     button.set_state(True)
                     button_active.set_state(False)
-                    mp.type = button.text if button.text in ('map', 'sat') else mp.type + f',{button.text}'
+                    keys = ['map', 'sat', 'trf', 'skl']
+                    mp.type = mp.type + f',{button.text}' if button.text not in ('map', 'sat') and button.text \
+                                                             not in mp.type.split(',') \
+                        else ('map,' if 'map' in mp.type else 'sat,') + button.text
+                    mp.type = ','.join(sorted(list(set(mp.type.split(','))), key=lambda x: keys.index(x)))
+            if mp.clear_search_button.check_pos(event.pos):
+                mp.input_box.text = ''
+                mp.input_box.txt_surface = mp.input_box.font.render(mp.input_box.text, True, mp.input_box.color)
+                mp.search_result = None
         else:
             continue
         mp.input_box.handle_event(event)
@@ -303,10 +313,11 @@ def main():
         map_file = load_map(mp)
 
         # Рисуем картинку, загружаемую из только что созданного файла.
-        screen.blit(pygame.image.load(map_file), (50, 50))
+        screen.blit(pygame.image.load(map_file), (150, 50))
 
         for button in mp.buttons:
             button.draw(screen)
+        mp.clear_search_button.draw(screen)
         pygame.display.flip()
 
     pygame.quit()
