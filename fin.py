@@ -2,7 +2,6 @@ import pygame
 import requests
 import sys
 import os
-
 import math
 
 # Подобранные константы для поведения карты.
@@ -64,6 +63,48 @@ class SearchResult(object):
         self.address = address
         self.postal_code = postal_code
 
+
+class Button:
+    def __init__(self, x, y, width, height, text):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.color = '#94a2b0'
+        self.active_color = '#59d770'
+        self.text_color = '#000000'
+        self.text = text
+        self.is_active = False
+        self.font = pygame.font.Font(None, 35)
+        self.image = pygame.Surface((width, height))
+        self.set_state(text == 'map')
+        self.rect = pygame.Rect(x, y, 20, 20)
+
+    def draw(self, screen):
+        screen.blit(self.image, [self.x, self.y])
+        self.add_button_text(screen)
+
+    def add_button_text(self, screen):
+        text = self.font.render(self.text, True, self.text_color)
+        text_x = self.width // 2 - text.get_width() // 2
+        text_y = self.height // 2 - text.get_height() // 2
+        screen.blit(text, (text_x, text_y))
+
+    def set_state(self, flag):
+        self.is_active = flag
+        if self.is_active:
+            pygame.draw.rect(self.image, pygame.Color(self.active_color), [0, 0,
+                                                                    self.width, self.height])
+            self.add_button_text(self.image)
+        else:
+            pygame.draw.rect(self.image, pygame.Color(self.color), [0, 0,
+                                                                    self.width, self.height])
+            self.add_button_text(self.image)
+
+    def check_pos(self, pos):
+        return self.x <= pos[0] <= self.x + self.width and self.y <= pos[1] <= self.y + self.height
+
+
 # Параметры отображения карты:
 # координаты, масштаб, найденные объекты и т.д.
 
@@ -78,6 +119,12 @@ class MapParams(object):
 
         self.search_result = None  # Найденный объект для отображения на карте.
         self.use_postal_code = False
+        self.buttons = [
+            Button(85, 5, 100, 40, 'sat'),
+            Button(195, 5, 100, 40, 'map'),
+            Button(305, 5, 100, 40, 'trf'),
+            Button(415, 5, 100, 40, 'skl')
+        ]
 
     # Преобразование координат в параметр ll
     def ll(self):
@@ -105,6 +152,7 @@ class MapParams(object):
             self.lat -= LAT_STEP * math.pow(2, 15 - self.zoom)
             if self.lat < 0:
                 self.lat = abs(self.lat) - 90
+
 
 # Создание карты с соответствующими параметрами.
 def load_map(mp):
@@ -137,12 +185,14 @@ def load_map(mp):
 def main():
     # Инициализируем pygame
     pygame.init()
-    screen = pygame.display.set_mode((600, 450))
+    screen = pygame.display.set_mode((600, 500))
 
     # Заводим объект, в котором будем хранить все параметры отрисовки карты.
     mp = MapParams()
     map_file = load_map(mp)
-    screen.blit(pygame.image.load(map_file), (0, 0))
+    screen.blit(pygame.image.load(map_file), (0, 50))
+    for button in mp.buttons:
+        button.draw(screen)
     pygame.display.flip()
 
     while True:
@@ -151,6 +201,13 @@ def main():
             break
         elif event.type == pygame.KEYDOWN:  # Обрабатываем различные нажатые клавиши.
             mp.update(event)
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            button_active = [button for button in mp.buttons if button.is_active][0]
+            for button in mp.buttons:
+                if button.check_pos(event.pos) and button is not button_active:
+                    button.set_state(True)
+                    button_active.set_state(False)
+                    mp.type = button.text if button.text in ('map', 'sat') else mp.type + f',{button.text}'
         else:
             continue
 
@@ -158,9 +215,10 @@ def main():
         map_file = load_map(mp)
 
         # Рисуем картинку, загружаемую из только что созданного файла.
-        screen.blit(pygame.image.load(map_file), (0, 0))
+        screen.blit(pygame.image.load(map_file), (0, 50))
 
-        # Переключаем экран и ждем закрытия окна.
+        for button in mp.buttons:
+            button.draw(screen)
         pygame.display.flip()
 
     pygame.quit()
