@@ -33,25 +33,34 @@ def lonlat_distance(a, b):
 
 # Найти объект по координатам.
 def reverse_geocode(ll):
-    geocoder_request_template = "http://geocode-maps.yandex.ru/1.x/?apikey=40d1649f-0493-4b70-98ba-98533de7710b&geocode={ll}&format=json"
 
-    # Выполняем запрос к геокодеру, анализируем ответ.
-    geocoder_request = geocoder_request_template.format(**locals())
-    response = requests.get(geocoder_request)
+    geocoder_api_server = "https://search-maps.yandex.ru/v1/"
+    geocoder_params = {
+        "apikey": "dda3ddba-c9ea-4ead-9010-f43fbc15c6e3",
+        "ll": ll,
+        "format": "json",
+        'text': 'all',
+        'lang': 'ru_RU',
+        "type": "biz",
+
+    }
+
+    response = requests.get(geocoder_api_server, params=geocoder_params)
 
     if not response:
         raise RuntimeError(
             """Ошибка выполнения запроса:
             {request}
             Http статус: {status} ({reason})""".format(
-                request=geocoder_request, status=response.status_code, reason=response.reason))
+                request=response, status=response.status_code, reason=response.reason))
 
     # Преобразуем ответ в json-объект
     json_response = response.json()
 
     # Получаем первый топоним из ответа геокодера.
-    features = json_response["response"]["GeoObjectCollection"]["featureMember"]
-    return features[0]["GeoObject"] if features else None
+    features = json_response["features"]
+    return min(features, key=lambda x: lonlat_distance(x["properties"]["boundedBy"][0],
+                                                       [float(item) for item in ll.split(',')])) if features else None
 
 
 def reverse_geocode_by_address(address):
@@ -325,6 +334,27 @@ def main():
                     mp.address_field.text = mp.address_field.text.split(', postcode:')[0]
                     mp.address_field.txt_surface = mp.address_field.font.render(mp.address_field.text,
                                                                                 True, mp.address_field.color)
+
+            if 150 <= event.pos[0] <= 750 and 50 <= event.pos[1] <= 500 and event.button == 1:
+                delta = [(150 + (750 - 150) / 2) - event.pos[0], (50 + (500 - 50) / 2) - event.pos[1]]
+                global coord_to_geo_x, coord_to_geo_y
+                delta[0] = delta[0] * coord_to_geo_x * math.pow(2, 15 - mp.zoom)
+                delta[1] = delta[1] * coord_to_geo_y * math.pow(2, 15 - mp.zoom)
+                data = reverse_geocode(f'{mp.lon + delta[0]},{mp.lat + delta[1]}')
+                data = data["properties"]
+
+                data = [
+                    [str(item) for item in data["boundedBy"][0]],
+                    data["CompanyMetaData"]["address"],
+                    data["CompanyMetaData"].get('postal_code', None)
+                ]
+
+                mp.search_result = SearchResult(*data)
+                mp.lon, mp.lat = float(mp.search_result.point[0]), float(mp.search_result.point[1])
+                mp.address_field.text = data[1] if not mp.add_postcode.is_active \
+                    else data[1] + f', postcode: {data[2]}'
+                mp.address_field.txt_surface = mp.address_field.font.render(mp.address_field.text,
+                                                                            True, mp.address_field.color)
         else:
             continue
         mp.input_box.handle_event(event)
