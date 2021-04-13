@@ -102,7 +102,7 @@ class Button:
         self.text_color = '#000000'
         self.text = text
         self.is_active = False
-        self.font = pygame.font.Font(None, 35)
+        self.font = pygame.font.Font(None, 25)
         self.image = pygame.Surface((width, height))
         self.set_state(text == 'map')
         self.rect = pygame.Rect(x, y, 20, 20)
@@ -160,7 +160,7 @@ class InputBox:
                     self.text = self.text[:-1]
                 else:
                     key = event.__str__().split('{')[1].split('}')[0].split(', ')[0].split(": '")[1][:-1]
-                    if key in '123456789- _qwertyuiopasdfghjklzxcvbnmйцукенгшщзхъэждлорпавыфячсмитьбю,':
+                    if key.lower() in '123456789- _qwertyuiopasdfghjklzxcvbnmйцукенгшщзхъэждлорпавыфячсмитьбю,':
                         self.text += key
                 # Re-render the text.
                 self.txt_surface = self.font.render(self.text[:17], True, self.color)
@@ -195,6 +195,7 @@ class MapParams(object):
         self.input_box = InputBox(10, 5, 200, 40, '#ffffff', '#000000')
         self.address_field = InputBox(10, 505, 700, 40, '#000000', '#000000')
         self.clear_search_button = Button(10, 50, 100, 40, 'clear')
+        self.add_postcode = Button(10, 450, 100, 40, 'postcode')
 
     # Преобразование координат в параметр ll
     def ll(self):
@@ -229,10 +230,12 @@ class MapParams(object):
                     data = [
                         data["Point"]["pos"].split(' '),
                         data["metaDataProperty"]["GeocoderMetaData"]['Address']['formatted'],
+                        data["metaDataProperty"]["GeocoderMetaData"]['Address'].get('postal_code', None)
                     ]
                     self.search_result = SearchResult(*data)
                     self.lon, self.lat = float(self.search_result.point[0]), float(self.search_result.point[1])
-                    self.address_field.text = data[1]
+                    self.address_field.text = data[1] if not self.add_postcode.is_active \
+                        else data[1] + f', postcode: {data[2]}'
                     self.address_field.txt_surface = self.address_field.font.render(self.address_field.text,
                                                                                     True, self.address_field.color)
 
@@ -285,6 +288,7 @@ def main():
     mp.input_box.draw(screen)
     mp.clear_search_button.draw(screen)
     mp.address_field.draw(screen)
+    mp.add_postcode.draw(screen)
     pygame.display.flip()
 
     while True:
@@ -311,6 +315,16 @@ def main():
                 mp.address_field.txt_surface = mp.address_field.font.render(mp.address_field.text,
                                                                             True, mp.address_field.color)
                 mp.search_result = None
+            if mp.add_postcode.check_pos(event.pos):
+                mp.add_postcode.set_state(not mp.add_postcode.is_active)
+                if mp.add_postcode.is_active and mp.search_result is not None:
+                    mp.address_field.text = mp.address_field.text + f', postcode: {mp.search_result.postal_code}'
+                    mp.address_field.txt_surface = mp.address_field.font.render(mp.address_field.text,
+                                                                                True, mp.address_field.color)
+                elif not mp.add_postcode.is_active and mp.search_result is not None:
+                    mp.address_field.text = mp.address_field.text.split(', postcode:')[0]
+                    mp.address_field.txt_surface = mp.address_field.font.render(mp.address_field.text,
+                                                                                True, mp.address_field.color)
         else:
             continue
         mp.input_box.handle_event(event)
@@ -319,6 +333,7 @@ def main():
         screen.fill('#b6c5b9')
         mp.input_box.draw(screen)
         mp.address_field.draw(screen)
+        mp.add_postcode.draw(screen)
 
         map_file = load_map(mp)
 
