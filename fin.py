@@ -31,6 +31,7 @@ def lonlat_distance(a, b):
 
     return distance
 
+
 # Найти объект по координатам.
 def reverse_geocode(ll):
     geocoder_request_template = "http://geocode-maps.yandex.ru/1.x/?apikey=40d1649f-0493-4b70-98ba-98533de7710b&geocode={ll}&format=json"
@@ -53,6 +54,7 @@ def reverse_geocode(ll):
     features = json_response["response"]["GeoObjectCollection"]["featureMember"]
     return features[0]["GeoObject"] if features else None
 
+
 # Структура для хранения результатов поиска:
 # координаты объекта, его название и почтовый индекс, если есть.
 
@@ -65,12 +67,13 @@ class SearchResult(object):
 # Параметры отображения карты:
 # координаты, масштаб, найденные объекты и т.д.
 
+
 class MapParams(object):
     # Параметры по умолчанию.
     def __init__(self):
-        self.lat = 55.729738  # Координаты центра карты на старте.
-        self.lon = 37.664777
-        self.zoom = 16  # Масштаб карты на старте.
+        self.lat = 58.010450  # Координаты центра карты на старте.
+        self.lon = 56.229434
+        self.zoom = 14  # Масштаб карты на старте.
         self.type = "map"  # Тип карты на старте.
 
         self.search_result = None  # Найденный объект для отображения на карте.
@@ -94,8 +97,6 @@ class MapParams(object):
             self.lat += LAT_STEP * math.pow(2, 15 - self.zoom)
         elif event.key == pygame.K_DOWN and self.lat > -85:  # DOWN_ARROW
             self.lat -= LAT_STEP * math.pow(2, 15 - self.zoom)
-
-
 
 
 # Создание карты с соответствующими параметрами.
@@ -125,6 +126,7 @@ def load_map(mp):
 
     return map_file
 
+
 def main():
     # Инициализируем pygame
     pygame.init()
@@ -132,6 +134,9 @@ def main():
 
     # Заводим объект, в котором будем хранить все параметры отрисовки карты.
     mp = MapParams()
+    map_file = load_map(mp)
+    screen.blit(pygame.image.load(map_file), (0, 0))
+    pygame.display.flip()
 
     while True:
         event = pygame.event.wait()
