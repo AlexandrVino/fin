@@ -85,7 +85,7 @@ def reverse_geocode_by_address(address):
 # координаты объекта, его название и почтовый индекс, если есть.
 
 class SearchResult(object):
-    def __init__(self, point, address=None, postal_code=None):
+    def __init__(self, point, address, postal_code=None):
         self.point = point
         self.address = address
         self.postal_code = postal_code
@@ -193,6 +193,7 @@ class MapParams(object):
             Button(560, 5, 100, 40, 'skl')
         ]
         self.input_box = InputBox(10, 5, 200, 40, '#ffffff', '#000000')
+        self.address_field = InputBox(10, 505, 700, 40, '#000000', '#000000')
         self.clear_search_button = Button(10, 50, 100, 40, 'clear')
 
     # Преобразование координат в параметр ll
@@ -227,9 +228,13 @@ class MapParams(object):
                 if data is not None:
                     data = [
                         data["Point"]["pos"].split(' '),
+                        data["metaDataProperty"]["GeocoderMetaData"]['Address']['formatted'],
                     ]
                     self.search_result = SearchResult(*data)
                     self.lon, self.lat = float(self.search_result.point[0]), float(self.search_result.point[1])
+                    self.address_field.text = data[1]
+                    self.address_field.txt_surface = self.address_field.font.render(self.address_field.text,
+                                                                                    True, self.address_field.color)
 
 
 # Создание карты с соответствующими параметрами.
@@ -268,7 +273,7 @@ def load_map(mp):
 def main():
     # Инициализируем pygame
     pygame.init()
-    screen = pygame.display.set_mode((800, 500))
+    screen = pygame.display.set_mode((800, 550))
     screen.fill('#b6c5b9')
 
     # Заводим объект, в котором будем хранить все параметры отрисовки карты.
@@ -279,6 +284,7 @@ def main():
         button.draw(screen)
     mp.input_box.draw(screen)
     mp.clear_search_button.draw(screen)
+    mp.address_field.draw(screen)
     pygame.display.flip()
 
     while True:
@@ -301,6 +307,9 @@ def main():
             if mp.clear_search_button.check_pos(event.pos):
                 mp.input_box.text = ''
                 mp.input_box.txt_surface = mp.input_box.font.render(mp.input_box.text, True, mp.input_box.color)
+                mp.address_field.text = ""
+                mp.address_field.txt_surface = mp.address_field.font.render(mp.address_field.text,
+                                                                            True, mp.address_field.color)
                 mp.search_result = None
         else:
             continue
@@ -309,6 +318,7 @@ def main():
         # Загружаем карту, используя текущие параметры.
         screen.fill('#b6c5b9')
         mp.input_box.draw(screen)
+        mp.address_field.draw(screen)
 
         map_file = load_map(mp)
 
