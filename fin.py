@@ -91,13 +91,20 @@ class MapParams(object):
             self.zoom -= 1
         elif event.key == pygame.K_LEFT:  # LEFT_ARROW
             self.lon -= LON_STEP * math.pow(2, 15 - self.zoom)
+            if self.lon < 0:
+                self.lon = 180
         elif event.key == pygame.K_RIGHT:  # RIGHT_ARROW
             self.lon += LON_STEP * math.pow(2, 15 - self.zoom)
+            if self.lon >= 180:
+                self.lon = 180 - self.lon
         elif event.key == pygame.K_UP and self.lat < 85:  # UP_ARROW
             self.lat += LAT_STEP * math.pow(2, 15 - self.zoom)
+            if self.lat >= 90:
+                self.lat = 90 - self.lat
         elif event.key == pygame.K_DOWN and self.lat > -85:  # DOWN_ARROW
             self.lat -= LAT_STEP * math.pow(2, 15 - self.zoom)
-
+            if self.lat < 0:
+                self.lat = abs(self.lat) - 90
 
 # Создание карты с соответствующими параметрами.
 def load_map(mp):
