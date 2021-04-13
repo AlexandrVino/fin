@@ -228,6 +228,7 @@ class MapParams(object):
                         data["Point"]["pos"].split(' '),
                     ]
                     self.search_result = SearchResult(*data)
+                    self.lon, self.lat = float(self.search_result.point[0]), float(self.search_result.point[1])
 
 
 # Создание карты с соответствующими параметрами.
@@ -243,8 +244,6 @@ def load_map(mp):
     if mp.search_result:
         geocoder_params['pt'] = "{0},{1},pm2grm".format(mp.search_result.point[0],
                                                         mp.search_result.point[1])
-        mp.lon, mp.lat = mp.search_result.point[0], mp.search_result.point[1]
-        geocoder_params['ll'] = mp.ll()
     response = requests.get(geocoder_api_server, params=geocoder_params)
 
     if not response:
