@@ -32,7 +32,7 @@ def lonlat_distance(a, b):
 
 
 # Найти объект по координатам.
-def get_address_by_ll(ll):
+def get_address_by_ll(ll, filter_key=None):
     geocoder_api_server = "http://geocode-maps.yandex.ru/1.x/"
 
     geocoder_params = {
@@ -56,6 +56,12 @@ def get_address_by_ll(ll):
     features = json_response["response"]["GeoObjectCollection"]["featureMember"]
     if not features:
         return None
+    if filter_key is not None:
+        filter_key = lambda x: lonlat_distance(
+            [float(coord) for coord in x["GeoObject"]["Point"]["pos"].split(' ')],
+            [float(item) for item in ll.split(',')]) <= 50
+        feature_filter = list(filter(filter_key, features))
+        return feature_filter[0] if feature_filter else None
     feature_min = min(features, key=lambda x: lonlat_distance(
         [float(coord) for coord in x["GeoObject"]["Point"]["pos"].split(' ')],
         [float(item) for item in ll.split(',')]))
@@ -247,7 +253,6 @@ class MapParams(object):
                         else data[1] + f', postcode: {data[2]}'
                     self.address_field.txt_surface = self.address_field.font.render(self.address_field.text,
                                                                                     True, self.address_field.color)
-        print(self.ll())
 
 
 # Создание карты с соответствующими параметрами.
@@ -342,6 +347,30 @@ def main():
                 delta[0] = delta[0] * coord_to_geo_x * math.pow(2, 15 - mp.zoom)
                 delta[1] = delta[1] * coord_to_geo_y * math.pow(2, 15 - mp.zoom) / 2
                 address = get_address_by_ll(f'{mp.lon + delta[0]},{mp.lat + delta[1]}')
+                address = address["GeoObject"]["metaDataProperty"]["GeocoderMetaData"]["text"]
+
+                data = reverse_geocode_by_address(address)
+
+                data = [
+                    data["Point"]["pos"].split(' '),
+                    data["metaDataProperty"]["GeocoderMetaData"]['Address']['formatted'],
+                    data["metaDataProperty"]["GeocoderMetaData"]['Address'].get('postal_code', None)
+                ]
+
+                mp.search_result = SearchResult(*data)
+                mp.lon, mp.lat = float(mp.search_result.point[0]), float(mp.search_result.point[1])
+                mp.address_field.text = data[1] if not mp.add_postcode.is_active \
+                    else data[1] + f', postcode: {data[2]}'
+                mp.address_field.txt_surface = mp.address_field.font.render(mp.address_field.text,
+                                                                            True, mp.address_field.color)
+            if 150 <= event.pos[0] <= 750 and 50 <= event.pos[1] <= 500 and event.button == 3:
+                delta = [event.pos[0] - (150 + (750 - 150) / 2), (50 + (500 - 50) / 2) - event.pos[1]]
+
+                delta[0] = delta[0] * coord_to_geo_x * math.pow(2, 15 - mp.zoom)
+                delta[1] = delta[1] * coord_to_geo_y * math.pow(2, 15 - mp.zoom) / 2
+                address = get_address_by_ll(f'{mp.lon + delta[0]},{mp.lat + delta[1]}', filter_key=True)
+                if address is None:
+                    continue
                 address = address["GeoObject"]["metaDataProperty"]["GeocoderMetaData"]["text"]
 
                 data = reverse_geocode_by_address(address)
