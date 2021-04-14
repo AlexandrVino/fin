@@ -340,7 +340,7 @@ def main():
                 delta = [event.pos[0] - (150 + (750 - 150) / 2), (50 + (500 - 50) / 2) - event.pos[1]]
                 global coord_to_geo_x, coord_to_geo_y
                 delta[0] = delta[0] * coord_to_geo_x * math.pow(2, 15 - mp.zoom)
-                delta[1] = delta[1] * coord_to_geo_y * math.pow(2, 15 - mp.zoom)
+                delta[1] = delta[1] * coord_to_geo_y * math.pow(2, 15 - mp.zoom) / 2
                 address = get_address_by_ll(f'{mp.lon + delta[0]},{mp.lat + delta[1]}')
                 address = address["GeoObject"]["metaDataProperty"]["GeocoderMetaData"]["text"]
 
