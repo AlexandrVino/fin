@@ -289,6 +289,7 @@ def load_map(mp):
 
 
 def main():
+    global coord_to_geo_x, coord_to_geo_y
     # Инициализируем pygame
     pygame.init()
     screen = pygame.display.set_mode((800, 550))
@@ -343,7 +344,7 @@ def main():
 
             if 150 <= event.pos[0] <= 750 and 50 <= event.pos[1] <= 500 and event.button == 1:
                 delta = [event.pos[0] - (150 + (750 - 150) / 2), (50 + (500 - 50) / 2) - event.pos[1]]
-                global coord_to_geo_x, coord_to_geo_y
+
                 delta[0] = delta[0] * coord_to_geo_x * math.pow(2, 15 - mp.zoom)
                 delta[1] = delta[1] * coord_to_geo_y * math.pow(2, 15 - mp.zoom) / 2
                 address = get_address_by_ll(f'{mp.lon + delta[0]},{mp.lat + delta[1]}')
@@ -364,6 +365,27 @@ def main():
                 mp.address_field.txt_surface = mp.address_field.font.render(mp.address_field.text,
                                                                             True, mp.address_field.color)
             if 150 <= event.pos[0] <= 750 and 50 <= event.pos[1] <= 500 and event.button == 3:
+                mp.input_box.text = ''
+                mp.input_box.txt_surface = mp.input_box.font.render(mp.input_box.text, True, mp.input_box.color)
+                mp.address_field.text = ""
+                mp.address_field.txt_surface = mp.address_field.font.render(mp.address_field.text,
+                                                                            True, mp.address_field.color)
+                mp.search_result = None
+                screen.fill('#b6c5b9')
+                mp.input_box.draw(screen)
+                mp.address_field.draw(screen)
+                mp.add_postcode.draw(screen)
+
+                map_file = load_map(mp)
+
+                # Рисуем картинку, загружаемую из только что созданного файла.
+                screen.blit(pygame.image.load(map_file), (150, 50))
+
+                for button in mp.buttons:
+                    button.draw(screen)
+                mp.clear_search_button.draw(screen)
+                pygame.display.flip()
+
                 delta = [event.pos[0] - (150 + (750 - 150) / 2), (50 + (500 - 50) / 2) - event.pos[1]]
 
                 delta[0] = delta[0] * coord_to_geo_x * math.pow(2, 15 - mp.zoom)
