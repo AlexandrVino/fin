@@ -32,18 +32,13 @@ def lonlat_distance(a, b):
 
 
 # Найти объект по координатам.
-def reverse_geocode(ll):
+def get_address_by_ll(ll):
+    geocoder_api_server = "http://geocode-maps.yandex.ru/1.x/"
 
-    geocoder_api_server = "https://search-maps.yandex.ru/v1/"
     geocoder_params = {
-        "apikey": "dda3ddba-c9ea-4ead-9010-f43fbc15c6e3",
-        "ll": ll,
-        "format": "json",
-        'text': 'all',
-        'lang': 'ru_RU',
-        "type": "biz",
-
-    }
+        "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
+        "geocode": ll,
+        "format": "json"}
 
     response = requests.get(geocoder_api_server, params=geocoder_params)
 
@@ -58,9 +53,13 @@ def reverse_geocode(ll):
     json_response = response.json()
 
     # Получаем первый топоним из ответа геокодера.
-    features = json_response["features"]
-    return min(features, key=lambda x: lonlat_distance(x["properties"]["boundedBy"][0],
-                                                       [float(item) for item in ll.split(',')])) if features else None
+    features = json_response["response"]["GeoObjectCollection"]["featureMember"]
+    if not features:
+        return None
+    feature_min = min(features, key=lambda x: lonlat_distance(
+        [float(coord) for coord in x["GeoObject"]["Point"]["pos"].split(' ')],
+        [float(item) for item in ll.split(',')]))
+    return feature_min
 
 
 def reverse_geocode_by_address(address):
@@ -212,6 +211,7 @@ class MapParams(object):
 
     # Обновление параметров карты по нажатой клавише.
     def update(self, event):
+
         if event.key == pygame.K_PAGEUP and self.zoom < 19:  # PG_UP
             self.zoom += 1
         elif event.key == pygame.K_PAGEDOWN and self.zoom > 2:  # PG_DOWN
@@ -247,6 +247,7 @@ class MapParams(object):
                         else data[1] + f', postcode: {data[2]}'
                     self.address_field.txt_surface = self.address_field.font.render(self.address_field.text,
                                                                                     True, self.address_field.color)
+        print(self.ll())
 
 
 # Создание карты с соответствующими параметрами.
@@ -336,17 +337,19 @@ def main():
                                                                                 True, mp.address_field.color)
 
             if 150 <= event.pos[0] <= 750 and 50 <= event.pos[1] <= 500 and event.button == 1:
-                delta = [(150 + (750 - 150) / 2) - event.pos[0], (50 + (500 - 50) / 2) - event.pos[1]]
+                delta = [event.pos[0] - (150 + (750 - 150) / 2), (50 + (500 - 50) / 2) - event.pos[1]]
                 global coord_to_geo_x, coord_to_geo_y
                 delta[0] = delta[0] * coord_to_geo_x * math.pow(2, 15 - mp.zoom)
                 delta[1] = delta[1] * coord_to_geo_y * math.pow(2, 15 - mp.zoom)
-                data = reverse_geocode(f'{mp.lon + delta[0]},{mp.lat + delta[1]}')
-                data = data["properties"]
+                address = get_address_by_ll(f'{mp.lon + delta[0]},{mp.lat + delta[1]}')
+                address = address["GeoObject"]["metaDataProperty"]["GeocoderMetaData"]["text"]
+
+                data = reverse_geocode_by_address(address)
 
                 data = [
-                    [str(item) for item in data["boundedBy"][0]],
-                    data["CompanyMetaData"]["address"],
-                    data["CompanyMetaData"].get('postal_code', None)
+                    data["Point"]["pos"].split(' '),
+                    data["metaDataProperty"]["GeocoderMetaData"]['Address']['formatted'],
+                    data["metaDataProperty"]["GeocoderMetaData"]['Address'].get('postal_code', None)
                 ]
 
                 mp.search_result = SearchResult(*data)
