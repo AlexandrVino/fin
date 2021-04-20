@@ -61,7 +61,32 @@ def get_address_by_ll(ll, filter_key=None):
             [float(coord) for coord in x["GeoObject"]["Point"]["pos"].split(' ')],
             [float(item) for item in ll.split(',')]) <= 50
         feature_filter = list(filter(filter_key, features))
-        return feature_filter[0] if feature_filter else None
+        if feature_filter:
+            search_api_server = "https://search-maps.yandex.ru/v1/"
+            api_key = "dda3ddba-c9ea-4ead-9010-f43fbc15c6e3"
+
+            search_params = {
+                "apikey": api_key,
+                "text": feature_filter[0]["GeoObject"]["metaDataProperty"]["GeocoderMetaData"]["text"],
+                "lang": "ru_RU",
+                "ll": ','.join(feature_filter[0]['GeoObject']["Point"]["pos"].split(' ')),
+                "type": "biz"
+
+            }
+            response = requests.get(search_api_server, params=search_params)
+            json_response = response.json()
+            # print(json_response)
+            filter_key = lambda x: lonlat_distance(
+                [float(coord) for coord in x["geometry"]['coordinates']],
+                [float(item) for item in ll.split(',')]) <= 50
+            feature_filter = list(filter(filter_key, json_response['features']))
+            feature_min = min(feature_filter, key=lambda x: lonlat_distance(
+                [float(coord) for coord in x["geometry"]['coordinates']],
+                [float(item) for item in ll.split(',')]))
+            print(feature_min)
+            return feature_min
+        else:
+            return None
     feature_min = min(features, key=lambda x: lonlat_distance(
         [float(coord) for coord in x["GeoObject"]["Point"]["pos"].split(' ')],
         [float(item) for item in ll.split(',')]))
@@ -393,15 +418,23 @@ def main():
                 address = get_address_by_ll(f'{mp.lon + delta[0]},{mp.lat + delta[1]}', filter_key=True)
                 if address is None:
                     continue
-                address = address["GeoObject"]["metaDataProperty"]["GeocoderMetaData"]["text"]
+                try:
+                    address = address["GeoObject"]["metaDataProperty"]["GeocoderMetaData"]["text"]
 
-                data = reverse_geocode_by_address(address)
+                    data = reverse_geocode_by_address(address)
 
-                data = [
-                    data["Point"]["pos"].split(' '),
-                    data["metaDataProperty"]["GeocoderMetaData"]['Address']['formatted'],
-                    data["metaDataProperty"]["GeocoderMetaData"]['Address'].get('postal_code', None)
-                ]
+                    data = [
+                        data["Point"]["pos"].split(' '),
+                        data["metaDataProperty"]["GeocoderMetaData"]['Address']['formatted'],
+                        data["metaDataProperty"]["GeocoderMetaData"]['Address'].get('postal_code', None)
+                    ]
+                except KeyError:
+
+                    data = [
+                        address["geometry"]["coordinates"],
+                        address["properties"]["name"],
+                        None
+                    ]
 
                 mp.search_result = SearchResult(*data)
                 mp.lon, mp.lat = float(mp.search_result.point[0]), float(mp.search_result.point[1])
